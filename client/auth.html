@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ChatApp - Login & Register</title>
+    <link rel="stylesheet" href="/css/auth.css">
+</head>
+<body>
+    <main class="auth-page">
+        <section class="brand-panel">
+            <div class="brand-mark">C</div>
+            <h1>ChatApp</h1>
+            <p>Private one-to-one conversations with a security-first design.</p>
+            <div class="security-list">
+                <span>🔒 Secure authentication</span>
+                <span>💬 Private conversations</span>
+                <span>📷 Image & video sharing</span>
+            </div>
+        </section>
+
+        <section class="auth-card">
+            <div class="tabs">
+                <button class="tab active" data-form="loginForm">Login</button>
+                <button class="tab" data-form="registerForm">Create account</button>
+            </div>
+
+            <form id="loginForm" class="auth-form active">
+                <h2>Welcome back</h2>
+                <p class="muted">Sign in to continue your private chats.</p>
+
+                <label>Email</label>
+                <input id="loginEmail" type="email" autocomplete="email" placeholder="you@example.com" required>
+
+                <label>Password</label>
+                <input id="loginPassword" type="password" autocomplete="current-password" placeholder="Your password" required>
+
+                <button class="primary-btn" type="submit">Sign in</button>
+                <p id="loginMessage" class="form-message"></p>
+            </form>
+
+            <form id="registerForm" class="auth-form">
+                <h2>Create your account</h2>
+                <p class="muted">Start a private conversation with another user.</p>
+
+                <label>Username</label>
+                <input id="registerUsername" type="text" autocomplete="username" placeholder="3–30 characters" minlength="3" maxlength="30" required>
+
+                <label>Email</label>
+                <input id="registerEmail" type="email" autocomplete="email" placeholder="you@example.com" required>
+
+                <label>Password</label>
+                <input id="registerPassword" type="password" autocomplete="new-password" placeholder="Minimum 8 characters" minlength="8" required>
+
+                <button class="primary-btn" type="submit">Create account</button>
+                <p id="registerMessage" class="form-message"></p>
+            </form>
+        </section>
+    </main>
+
+    <script src="/js/auth.js"></script>
+</body>
+</html>

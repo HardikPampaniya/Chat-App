@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ChatApp</title>
+    <link rel="stylesheet" href="/css/chat.css">
+</head>
+<body>
+    <div class="chat-shell">
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div>
+                    <div class="brand-small">ChatApp</div>
+                    <div id="currentUser" class="muted small"></div>
+                </div>
+                <button id="logoutBtn" class="icon-btn" title="Logout">↪</button>
+            </div>
+
+            <div class="search-wrap">
+                <input id="userSearch" type="search" placeholder="Search users...">
+            </div>
+
+            <div id="userList" class="user-list"></div>
+        </aside>
+
+        <main class="conversation-panel">
+            <header class="conversation-header">
+                <div>
+                    <h2 id="chatTitle">Select a user</h2>
+                    <p id="chatStatus" class="muted">Choose someone to start a private chat.</p>
+                </div>
+                <a href="/profile.html" class="profile-link">Profile</a>
+            </header>
+
+            <section id="messages" class="messages">
+                <div class="empty-state">
+                    <div class="empty-icon">💬</div>
+                    <h3>Your private messages</h3>
+                    <p>Select a user from the left to begin.</p>
+                </div>
+            </section>
+
+            <form id="messageForm" class="composer">
+                <label class="attach-btn" title="Send image or video">
+                    📎
+                    <input id="mediaInput" type="file" accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm,video/quicktime" hidden>
+                </label>
+                <input id="messageInput" type="text" maxlength="5000" placeholder="Type a message..." autocomplete="off" disabled>
+                <button type="submit" class="send-btn" disabled>Send</button>
+            </form>
+        </main>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="/js/chat.js"></script>
+</body>
+</html>
