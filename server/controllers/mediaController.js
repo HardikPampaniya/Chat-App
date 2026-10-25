@@ -6,10 +6,48 @@ const mongoose = require("mongoose");
 const Conversation = require("../models/Conversation");
 const Message = require("../models/Message");
 const { isParticipant } = require("./conversationController");
-const { getMedia: getStoredMedia, putMedia, deleteMedia } = require("../services/objectStorage");
+const { getMedia: getStoredMedia, getMediaMetadata, putMedia, deleteMedia } = require("../services/objectStorage");
 const { getMediaDefinition, hasValidSignature, sanitizeOriginalName } = require("../utils/mediaTypes");
 
 const roomFor = id => `conversation:${id}`;
+
+const parseByteRange = (header, size) => {
+    if (!header || !header.startsWith("bytes=")) return null;
+    const value = header.slice(6).trim();
+    if (value.includes(",")) return { unsatisfiable: true };
+
+    const match = /^(\d*)-(\d*)$/.exec(value);
+    if (!match || (!match[1] && !match[2])) return null;
+
+    let start;
+    let end;
+    if (!match[1]) {
+        const suffixLength = Number(match[2]);
+        if (!Number.isSafeInteger(suffixLength) || suffixLength <= 0) return { unsatisfiable: true };
+        start = Math.max(0, size - suffixLength);
+        end = size - 1;
+    } else {
+        start = Number(match[1]);
+        end = match[2] ? Number(match[2]) : size - 1;
+        if (!Number.isSafeInteger(start) || !Number.isSafeInteger(end) || start >= size || start > end) {
+            return { unsatisfiable: true };
+        }
+        end = Math.min(end, size - 1);
+    }
+    return { start, end };
+};
+
+const setMediaHeaders = (res, message) => {
+    const isDocument = message.type === "document";
+    const safeName = encodeURIComponent(message.media.originalName || "attachment").replace(/['()]/g, escape);
+    res.set({
+        "Content-Type": message.media.mimeType || "application/octet-stream",
+        "Content-Disposition": `${isDocument ? "attachment" : "inline"}; filename*=UTF-8''${safeName}`,
+        "X-Content-Type-Options": "nosniff",
+        "Cache-Control": "private, no-store",
+        "Accept-Ranges": "bytes"
+    });
+};
 
 const sendMedia = async (req, res) => {
     const conversationId = req.params.conversationId;
@@ -117,21 +155,27 @@ const getMedia = async (req, res) => {
         return res.status(403).send("Access denied");
     }
 
-    const isDocument = message.type === "document";
-    const disposition = isDocument ? "attachment" : "inline";
-    const safeName = encodeURIComponent(message.media.originalName || "attachment").replace(/['()]/g, escape);
-
-    res.set({
-        "Content-Type": message.media.mimeType || "application/octet-stream",
-        "Content-Disposition": `${disposition}; filename*=UTF-8''${safeName}`,
-        "X-Content-Type-Options": "nosniff",
-        "Cache-Control": "private, no-store"
-    });
-    if (message.media.size) res.set("Content-Length", String(message.media.size));
-
     if (message.media.storageKey) {
-        const object = await getStoredMedia(message.media.storageKey);
-        if (object.ContentLength) res.set("Content-Length", String(object.ContentLength));
+        const metadata = await getMediaMetadata(message.media.storageKey);
+        const size = Number(metadata.ContentLength ?? message.media.size);
+        const range = parseByteRange(req.headers.range, size);
+        setMediaHeaders(res, message);
+        if (range?.unsatisfiable) {
+            res.set("Content-Range", `bytes */${size}`);
+            return res.status(416).end();
+        }
+
+        const object = await getStoredMedia(
+            message.media.storageKey,
+            range ? `bytes=${range.start}-${range.end}` : undefined
+        );
+        if (range) {
+            res.status(206);
+            res.set("Content-Range", `bytes ${range.start}-${range.end}/${size}`);
+            res.set("Content-Length", String(range.end - range.start + 1));
+        } else {
+            res.set("Content-Length", String(size));
+        }
         await pipeline(object.Body, res);
         return;
     }
@@ -143,6 +187,21 @@ const getMedia = async (req, res) => {
     if (!legacyName || path.dirname(legacyPath) !== legacyRoot || !fs.existsSync(legacyPath)) {
         return res.status(410).send("This legacy attachment is no longer available");
     }
+    const fileStat = await fs.promises.stat(legacyPath);
+    const range = parseByteRange(req.headers.range, fileStat.size);
+    setMediaHeaders(res, message);
+    if (range?.unsatisfiable) {
+        res.set("Content-Range", `bytes */${fileStat.size}`);
+        return res.status(416).end();
+    }
+    if (range) {
+        res.status(206);
+        res.set("Content-Range", `bytes ${range.start}-${range.end}/${fileStat.size}`);
+        res.set("Content-Length", String(range.end - range.start + 1));
+        await pipeline(fs.createReadStream(legacyPath, { start: range.start, end: range.end }), res);
+        return;
+    }
+    res.set("Content-Length", String(fileStat.size));
     await pipeline(fs.createReadStream(legacyPath), res);
 };
 

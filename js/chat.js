@@ -17,6 +17,9 @@ const state = {
     reconnectTimer: null,
     closeCallTimer: null,
     uploadRequest: null,
+    uploadActive: false,
+    cancelUploadRequested: false,
+    multipartUploadId: null,
     pendingUploadIds: new Map(),
     uploadPreviewUrl: null,
     uploadHideTimer: null,
@@ -40,6 +43,8 @@ const remoteAudio = byId("remoteAudio");
 const getId = value => String(value && typeof value === "object" ? value._id || value.id || "" : value || "");
 const conversationId = () => state.conversation ? getId(state.conversation._id) : "";
 const pendingKey = (id, text) => `${id}\u0000${text}`;
+const MAX_MEDIA_SIZE_BYTES = 2 * 1024 * 1024 * 1024;
+const MULTIPART_THRESHOLD_BYTES = 50 * 1024 * 1024;
 
 const api = async (url, options = {}) => {
     const response = await fetch(url, { credentials: "include", ...options });
@@ -625,24 +630,138 @@ const hideUpload = () => {
     clearUploadPreview();
 };
 
+const sendMultipartPart = (conversation, uploadId, partNumber, chunk, uploadedBytes, file, onProgress) =>
+    new Promise((resolve, reject) => {
+        const request = new XMLHttpRequest();
+        state.uploadRequest = request;
+        request.open("PUT", `/api/messages/${encodeURIComponent(conversation)}/media/multipart/${encodeURIComponent(uploadId)}/parts/${partNumber}`);
+        request.withCredentials = true;
+        request.setRequestHeader("Content-Type", "application/octet-stream");
+        request.upload.addEventListener("progress", event => {
+            if (!event.lengthComputable) return;
+            onProgress(uploadedBytes + Math.min(event.loaded, chunk.size), file.size);
+        });
+        request.addEventListener("load", () => {
+            state.uploadRequest = null;
+            let response = {};
+            try { response = JSON.parse(request.responseText); } catch { /* Invalid responses get a readable fallback. */ }
+            if (request.status === 401) {
+                window.location.href = "/";
+                reject(new Error("Your session has ended. Sign in again."));
+                return;
+            }
+            if (request.status < 200 || request.status >= 300) {
+                reject(new Error(response.message || "Upload failed. Try again."));
+                return;
+            }
+            resolve(response);
+        });
+        request.addEventListener("error", () => {
+            state.uploadRequest = null;
+            reject(new Error("Network error. Check your connection and try again."));
+        });
+        request.addEventListener("abort", () => {
+            state.uploadRequest = null;
+            reject(new Error("Upload canceled"));
+        });
+        request.send(chunk);
+    });
+
+const uploadLargeFile = async (id, file, uploadKey, clientMessageId) => {
+    let uploadId = null;
+    state.uploadActive = true;
+    state.cancelUploadRequested = false;
+    try {
+        const started = await api(`/api/messages/${encodeURIComponent(id)}/media/multipart`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ fileName: file.name, mimeType: file.type, size: file.size, clientMessageId })
+        });
+        if (started.message) {
+            state.pendingUploadIds.delete(uploadKey);
+            renderMessage(started.message);
+            byId("uploadProgress").value = 100;
+            byId("uploadStatus").textContent = "Attachment already sent";
+            state.uploadHideTimer = setTimeout(hideUpload, 1800);
+            return;
+        }
+
+        uploadId = started.uploadId;
+        state.multipartUploadId = uploadId;
+        const partSize = Number(started.partSize);
+        const partCount = Math.ceil(file.size / partSize);
+        if (!uploadId || !Number.isSafeInteger(partSize) || partSize <= 0 || !partCount) {
+            throw new Error("The server returned an invalid upload session.");
+        }
+
+        let uploadedBytes = 0;
+        for (let partNumber = 1; partNumber <= partCount; partNumber += 1) {
+            if (state.cancelUploadRequested) throw new Error("Upload canceled");
+            const start = (partNumber - 1) * partSize;
+            const end = Math.min(start + partSize, file.size);
+            const chunk = file.slice(start, end);
+            byId("uploadStatus").textContent = `Uploading ${file.name} · part ${partNumber} of ${partCount}`;
+            await sendMultipartPart(id, uploadId, partNumber, chunk, uploadedBytes, file, (current, total) => {
+                const percent = Math.min(99, Math.round((current / total) * 100));
+                byId("uploadProgress").value = percent;
+                byId("uploadStatus").textContent = `Uploading ${file.name} · ${percent}%`;
+            });
+            uploadedBytes = end;
+        }
+        if (state.cancelUploadRequested) throw new Error("Upload canceled");
+
+        const result = await api(`/api/messages/${encodeURIComponent(id)}/media/multipart/${encodeURIComponent(uploadId)}/complete`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ clientMessageId })
+        });
+        uploadId = null;
+        state.multipartUploadId = null;
+        state.pendingUploadIds.delete(uploadKey);
+        renderMessage(result.message);
+        byId("uploadProgress").value = 100;
+        byId("uploadStatus").textContent = "Attachment sent";
+        state.uploadHideTimer = setTimeout(hideUpload, 1800);
+    } catch (error) {
+        if (uploadId) {
+            await api(`/api/messages/${encodeURIComponent(id)}/media/multipart/${encodeURIComponent(uploadId)}`, {
+                method: "DELETE"
+            }).catch(() => {});
+        }
+        byId("uploadPanel").classList.add("error");
+        byId("uploadStatus").textContent = error.message || "Upload failed. Try again.";
+    } finally {
+        state.uploadRequest = null;
+        state.uploadActive = false;
+        state.cancelUploadRequested = false;
+        state.multipartUploadId = null;
+    }
+};
+
 const uploadFile = file => {
     const id = conversationId();
     if (!file || !id) return;
-    if (file.size > 50 * 1024 * 1024) {
-        showUpload(file, "This file is larger than 50 MB.");
+    if (file.size > MAX_MEDIA_SIZE_BYTES) {
+        showUpload(file, "This file is larger than 2 GB.");
         byId("uploadPanel").classList.add("error");
         return;
     }
 
-    const formData = new FormData();
     const uploadKey = `${id}\u0000${file.name}\u0000${file.size}\u0000${file.lastModified}`;
     const clientMessageId = state.pendingUploadIds.get(uploadKey) || (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`);
     state.pendingUploadIds.set(uploadKey, clientMessageId);
+    showUpload(file, `Ready to upload · ${formatBytes(file.size)}`);
+
+    if (file.size > MULTIPART_THRESHOLD_BYTES) {
+        uploadLargeFile(id, file, uploadKey, clientMessageId);
+        return;
+    }
+
+    const formData = new FormData();
     formData.append("clientMessageId", clientMessageId);
     formData.append("media", file);
     const request = new XMLHttpRequest();
     state.uploadRequest = request;
-    showUpload(file, `Ready to upload · ${formatBytes(file.size)}`);
     request.open("POST", `/api/messages/${encodeURIComponent(id)}/media`);
     request.withCredentials = true;
     request.upload.addEventListener("progress", event => {
@@ -691,6 +810,7 @@ mediaInput.addEventListener("change", () => {
 });
 byId("cancelUploadBtn").addEventListener("click", () => {
     if (state.uploadRequest) state.uploadRequest.abort();
+    else if (state.uploadActive) state.cancelUploadRequested = true;
     else hideUpload();
 });
 
@@ -730,11 +850,18 @@ const showCall = (title, status, incoming) => {
 };
 
 const friendlyMediaError = error => {
-    if (error?.name === "NotAllowedError" || error?.name === "SecurityError") return "Allow camera and microphone access in your browser, then try again.";
+    if (error?.name === "NotAllowedError" || error?.name === "SecurityError") return "Camera or microphone access was blocked. Allow it in your browser’s site settings, then reload and try again. Calls require HTTPS (or localhost).";
     if (error?.name === "NotFoundError" || error?.name === "DevicesNotFoundError") return "No microphone or camera was found on this device.";
     if (error?.name === "NotReadableError" || error?.name === "TrackStartError") return "The microphone or camera is already in use by another app.";
     if (!navigator.mediaDevices?.getUserMedia) return "Calls need a secure HTTPS connection and a browser with WebRTC support.";
     return "Could not access your microphone or camera. Check browser permissions and try again.";
+};
+
+const callErrorMessage = error => {
+    if (["NotAllowedError", "SecurityError", "NotFoundError", "DevicesNotFoundError", "NotReadableError", "TrackStartError"].includes(error?.name)) {
+        return friendlyMediaError(error);
+    }
+    return error?.message || friendlyMediaError(error);
 };
 
 const createPeerConnection = call => {
@@ -883,7 +1010,7 @@ const startOutgoingCall = async mode => {
     } catch (error) {
         if (state.call) {
             byId("callStatus").textContent = "Call could not start";
-            byId("callError").textContent = error.message || friendlyMediaError(error);
+            byId("callError").textContent = callErrorMessage(error);
             byId("activeActions").hidden = false;
         }
     }
@@ -909,7 +1036,7 @@ const acceptCall = async () => {
         createPeerConnection(call);
         showCall("Connecting…", "Setting up a secure peer connection.", false);
     } catch (error) {
-        byId("callError").textContent = error.message || friendlyMediaError(error);
+        byId("callError").textContent = callErrorMessage(error);
         if (state.socket?.connected) state.socket.emit("call:reject", { callId: call.callId });
         byId("callStatus").textContent = "Call declined";
         state.closeCallTimer = setTimeout(() => finishCallUi(), 2600);

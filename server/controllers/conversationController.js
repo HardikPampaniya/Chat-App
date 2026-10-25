@@ -2,8 +2,13 @@ const mongoose = require("mongoose");
 const User = require("../models/User");
 const Conversation = require("../models/Conversation");
 
+const idString = value => {
+    const id = value && typeof value === "object" && value._id ? value._id : value;
+    return id == null ? "" : id.toString();
+};
+
 const isParticipant = (conversation, userId) =>
-    conversation.participants.some(id => id.toString() === userId.toString());
+    conversation.participants.some(participant => idString(participant) === idString(userId));
 
 const findPrivateConversation = (a, b) =>
     Conversation.findOne({ participants: { $all: [a, b], $size: 2 } });

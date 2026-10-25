@@ -20,8 +20,13 @@ const authenticate = async socket => {
     return user;
 };
 
+const idString = value => {
+    const id = value && typeof value === "object" && value._id ? value._id : value;
+    return id == null ? "" : id.toString();
+};
+
 const isParticipant = (conversation, userId) =>
-    conversation.participants.some(id => id.toString() === userId.toString());
+    conversation.participants.some(participant => idString(participant) === idString(userId));
 
 const iceServers = () => {
     if (!process.env.ICE_SERVERS_JSON) {

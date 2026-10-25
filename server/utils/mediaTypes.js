@@ -1,3 +1,6 @@
+const MAX_MEDIA_SIZE_BYTES = 2 * 1024 * 1024 * 1024;
+const MEDIA_PART_SIZE_BYTES = 16 * 1024 * 1024;
+
 const definitions = [
     { type: "image", mimeType: "image/jpeg", extensions: [".jpg", ".jpeg"] },
     { type: "image", mimeType: "image/png", extensions: [".png"] },
@@ -94,4 +97,10 @@ const sanitizeOriginalName = value => {
     return base.slice(0, 180) || "attachment";
 };
 
-module.exports = { getMediaDefinition, hasValidSignature, sanitizeOriginalName };
+module.exports = {
+    getMediaDefinition,
+    hasValidSignature,
+    sanitizeOriginalName,
+    MAX_MEDIA_SIZE_BYTES,
+    MEDIA_PART_SIZE_BYTES
+};

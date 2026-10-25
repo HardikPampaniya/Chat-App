@@ -1,4 +1,14 @@
-const { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } = require("@aws-sdk/client-s3");
+const {
+    S3Client,
+    PutObjectCommand,
+    GetObjectCommand,
+    DeleteObjectCommand,
+    CreateMultipartUploadCommand,
+    UploadPartCommand,
+    CompleteMultipartUploadCommand,
+    AbortMultipartUploadCommand,
+    HeadObjectCommand
+} = require("@aws-sdk/client-s3");
 
 const bucket = process.env.MEDIA_BUCKET;
 const s3 = bucket
@@ -31,9 +41,56 @@ const putMedia = async ({ key, body, contentType, metadata }) => {
     return result.ETag;
 };
 
-const getMedia = async key => {
+const createMultipartMediaUpload = async ({ key, contentType, metadata }) => {
     requireStorage();
-    return s3.send(new GetObjectCommand({ Bucket: bucket, Key: key }));
+    const result = await s3.send(new CreateMultipartUploadCommand({
+        Bucket: bucket,
+        Key: key,
+        ContentType: contentType,
+        Metadata: metadata,
+        ServerSideEncryption: process.env.S3_SERVER_SIDE_ENCRYPTION || undefined
+    }));
+    return result.UploadId;
+};
+
+const uploadMediaPart = async ({ key, uploadId, partNumber, body }) => {
+    requireStorage();
+    const result = await s3.send(new UploadPartCommand({
+        Bucket: bucket,
+        Key: key,
+        UploadId: uploadId,
+        PartNumber: partNumber,
+        Body: body,
+        ContentLength: body.length
+    }));
+    return result.ETag;
+};
+
+const completeMultipartMediaUpload = async ({ key, uploadId, parts }) => {
+    requireStorage();
+    return s3.send(new CompleteMultipartUploadCommand({
+        Bucket: bucket,
+        Key: key,
+        UploadId: uploadId,
+        MultipartUpload: {
+            Parts: parts.map(part => ({ PartNumber: part.partNumber, ETag: part.etag }))
+        }
+    }));
+};
+
+const abortMultipartMediaUpload = async ({ key, uploadId }) => {
+    if (!key || !uploadId || !bucket || !s3) return;
+    await s3.send(new AbortMultipartUploadCommand({ Bucket: bucket, Key: key, UploadId: uploadId }));
+};
+
+const getMedia = async (key, range) => {
+    requireStorage();
+    return s3.send(new GetObjectCommand({ Bucket: bucket, Key: key, Range: range }));
+};
+
+const getMediaMetadata = async key => {
+    requireStorage();
+    return s3.send(new HeadObjectCommand({ Bucket: bucket, Key: key }));
 };
 
 const deleteMedia = async key => {
@@ -41,4 +98,13 @@ const deleteMedia = async key => {
     await s3.send(new DeleteObjectCommand({ Bucket: bucket, Key: key }));
 };
 
-module.exports = { putMedia, getMedia, deleteMedia };
+module.exports = {
+    putMedia,
+    createMultipartMediaUpload,
+    uploadMediaPart,
+    completeMultipartMediaUpload,
+    abortMultipartMediaUpload,
+    getMedia,
+    getMediaMetadata,
+    deleteMedia
+};

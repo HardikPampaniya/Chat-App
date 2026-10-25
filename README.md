@@ -35,6 +35,8 @@ Set these in your local `.env` or the Render service environment. Set `CLIENT_UR
 
 The configured object-storage identity needs permission to put, get and delete objects in the selected private bucket. Keep the bucket private; downloads are streamed through the authenticated app after checking conversation membership. The server stores only media metadata and the object key in MongoDB. Do not configure a public bucket URL.
 
+Images, videos, audio and documents can be up to 2 GiB. Files over 50 MiB upload to the private bucket in 16 MiB multipart chunks, so the server does not hold the complete file in memory. The storage identity needs `s3:PutObject`, `s3:GetObject`, `s3:DeleteObject` and `s3:AbortMultipartUpload` on the app's object key prefix. If the bucket uses a customer-managed KMS key, grant the corresponding KMS encrypt/decrypt permissions too. Add an S3 lifecycle rule to abort incomplete multipart uploads after one day so abandoned uploads do not retain billable parts.
+
 For reliable calls between different networks, configure a TURN service in `ICE_SERVERS_JSON` alongside STUN. TURN credentials are sent to authenticated call participants because browsers must use them to establish a connection. Prefer short-lived TURN credentials from your provider. The default STUN-only setting can fail behind restrictive NATs and corporate firewalls.
 
 Example `ICE_SERVERS_JSON` structure (replace the angle-bracket placeholders with values from your TURN provider; do not commit them):
