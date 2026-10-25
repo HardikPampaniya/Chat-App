@@ -49,6 +49,10 @@ const login = async (req, res) => {
     const email = String(req.body.email || "").trim().toLowerCase();
     const password = String(req.body.password || "");
 
+    if (!emailPattern.test(email) || password.length > 128) {
+        return res.status(401).json({ message: "Invalid email or password" });
+    }
+
     const user = await User.findOne({ email });
     if (!user) {
         return res.status(401).json({ message: "Invalid email or password" });
@@ -93,7 +97,8 @@ const me = async (req, res) => {
             id: req.user._id,
             username: req.user.username,
             email: req.user.email,
-            lastSeen: req.user.lastSeen
+            lastSeen: req.user.lastSeen,
+            createdAt: req.user.createdAt
         }
     });
 };

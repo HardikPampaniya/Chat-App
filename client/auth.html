@@ -3,61 +3,68 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ChatApp - Login & Register</title>
+    <meta name="theme-color" content="#f4f6fa">
+    <title>ChatApp - Private conversations</title>
     <link rel="stylesheet" href="/css/auth.css">
 </head>
 <body>
     <main class="auth-page">
-        <section class="brand-panel">
-            <div class="brand-mark">C</div>
-            <h1>ChatApp</h1>
-            <p>Private one-to-one conversations with a security-first design.</p>
-            <div class="security-list">
-                <span>🔒 Secure authentication</span>
-                <span>💬 Private conversations</span>
-                <span>📷 Image & video sharing</span>
+        <section class="brand-panel" aria-label="About ChatApp">
+            <a class="brand-lockup" href="/" aria-label="ChatApp home"><span class="brand-mark" aria-hidden="true">C</span><span>ChatApp</span></a>
+            <div class="brand-copy">
+                <p class="eyebrow">A quieter way to connect</p>
+                <h1>Good conversations, close at hand.</h1>
+                <p class="brand-description">Private chats, calls and shared moments with the people who matter.</p>
+                <ul class="feature-list">
+                    <li><span aria-hidden="true">✓</span> Private one-to-one conversations</li>
+                    <li><span aria-hidden="true">✓</span> Voice and video calls</li>
+                    <li><span aria-hidden="true">✓</span> Share images, clips and files</li>
+                </ul>
             </div>
+            <p class="brand-footer">Your conversations stay between you and the people you choose.</p>
         </section>
 
-        <section class="auth-card">
-            <div class="tabs">
-                <button class="tab active" data-form="loginForm">Login</button>
-                <button class="tab" data-form="registerForm">Create account</button>
+        <section class="auth-side" aria-label="Account access">
+            <div class="auth-card">
+                <div class="tabs" role="tablist" aria-label="Account access">
+                    <button class="tab active" type="button" role="tab" aria-selected="true" aria-controls="loginForm" data-form="loginForm">Sign in</button>
+                    <button class="tab" type="button" role="tab" aria-selected="false" aria-controls="registerForm" data-form="registerForm">Create account</button>
+                </div>
+
+                <form id="loginForm" class="auth-form active" role="tabpanel" aria-labelledby="loginTitle">
+                    <h2 id="loginTitle">Welcome back</h2>
+                    <p class="muted">Sign in to pick up where you left off.</p>
+
+                    <label for="loginEmail">Email address</label>
+                    <input id="loginEmail" name="email" type="email" autocomplete="email" inputmode="email" placeholder="you@example.com" required>
+
+                    <label for="loginPassword">Password</label>
+                    <input id="loginPassword" name="password" type="password" autocomplete="current-password" placeholder="Your password" required>
+
+                    <button class="primary-btn" type="submit"><span>Sign in</span><span aria-hidden="true">→</span></button>
+                    <p id="loginMessage" class="form-message" role="status" aria-live="polite"></p>
+                </form>
+
+                <form id="registerForm" class="auth-form" role="tabpanel" aria-labelledby="registerTitle" hidden>
+                    <h2 id="registerTitle">Create your account</h2>
+                    <p class="muted">It only takes a moment to get started.</p>
+
+                    <label for="registerUsername">Username</label>
+                    <input id="registerUsername" name="username" type="text" autocomplete="username" placeholder="Choose a username" minlength="3" maxlength="30" required>
+
+                    <label for="registerEmail">Email address</label>
+                    <input id="registerEmail" name="email" type="email" autocomplete="email" inputmode="email" placeholder="you@example.com" required>
+
+                    <label for="registerPassword">Password</label>
+                    <input id="registerPassword" name="new-password" type="password" autocomplete="new-password" placeholder="At least 8 characters" minlength="8" maxlength="128" required>
+
+                    <button class="primary-btn" type="submit"><span>Create account</span><span aria-hidden="true">→</span></button>
+                    <p id="registerMessage" class="form-message" role="status" aria-live="polite"></p>
+                </form>
             </div>
-
-            <form id="loginForm" class="auth-form active">
-                <h2>Welcome back</h2>
-                <p class="muted">Sign in to continue your private chats.</p>
-
-                <label>Email</label>
-                <input id="loginEmail" type="email" autocomplete="email" placeholder="you@example.com" required>
-
-                <label>Password</label>
-                <input id="loginPassword" type="password" autocomplete="current-password" placeholder="Your password" required>
-
-                <button class="primary-btn" type="submit">Sign in</button>
-                <p id="loginMessage" class="form-message"></p>
-            </form>
-
-            <form id="registerForm" class="auth-form">
-                <h2>Create your account</h2>
-                <p class="muted">Start a private conversation with another user.</p>
-
-                <label>Username</label>
-                <input id="registerUsername" type="text" autocomplete="username" placeholder="3–30 characters" minlength="3" maxlength="30" required>
-
-                <label>Email</label>
-                <input id="registerEmail" type="email" autocomplete="email" placeholder="you@example.com" required>
-
-                <label>Password</label>
-                <input id="registerPassword" type="password" autocomplete="new-password" placeholder="Minimum 8 characters" minlength="8" required>
-
-                <button class="primary-btn" type="submit">Create account</button>
-                <p id="registerMessage" class="form-message"></p>
-            </form>
+            <p class="auth-footer">By continuing, you agree to use ChatApp responsibly.</p>
         </section>
     </main>
-
     <script src="/js/auth.js"></script>
 </body>
 </html>

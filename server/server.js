@@ -19,6 +19,7 @@ const initializeChatSocket = require("./socket/chatSocket");
 
 const app = express();
 const server = http.createServer(app);
+app.set("trust proxy", 1);
 
 const allowedOrigin = process.env.CLIENT_URL || "http://localhost:3000";
 
@@ -50,6 +51,7 @@ app.use("/images", express.static(path.join(__dirname, "../images")));
 app.get("/", (req, res) => {
     res.sendFile(path.join(__dirname, "../client/auth.html"));
 });
+app.get("/healthz", (req, res) => res.status(200).json({ status: "ok" }));
 
 app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
@@ -80,7 +82,7 @@ const start = async () => {
     await connectDB();
 
     server.listen(PORT, () => {
-        console.log(`Server running at http://localhost:${PORT}`);
+        console.log("HTTP server is listening");
     });
 };
 

@@ -22,10 +22,10 @@ const getMessages = async (req, res) => {
     const messages = await Message.find({ conversation: conversationId })
         .populate("sender", "username")
         .populate("receiver", "username")
-        .sort({ createdAt: 1 })
+        .sort({ createdAt: -1 })
         .limit(200);
 
-    res.json({ messages });
+    res.json({ messages: messages.reverse() });
 };
 
 const createTextMessage = async (req, res) => {
@@ -49,20 +49,35 @@ const createTextMessage = async (req, res) => {
         id => id.toString() !== req.user._id.toString()
     );
 
-    const message = await Message.create({
-        conversation: conversation._id,
-        sender: req.user._id,
-        receiver,
-        type: "text",
-        text
-    });
+    let message;
+    const previousLastMessage = conversation.lastMessage;
+    try {
+        message = await Message.create({
+            conversation: conversation._id,
+            sender: req.user._id,
+            receiver,
+            type: "text",
+            text
+        });
 
-    conversation.lastMessage = message._id;
-    await conversation.save();
+        conversation.lastMessage = message._id;
+        await conversation.save();
+    } catch (error) {
+        if (message?._id) {
+            await Message.deleteOne({ _id: message._id }).catch(() => {});
+            conversation.lastMessage = previousLastMessage;
+            await conversation.save().catch(() => {});
+        }
+        throw error;
+    }
 
     await message.populate("sender", "username");
     await message.populate("receiver", "username");
 
+    req.app.get("io").to(`conversation:${conversationId}`)
+        .to(`user:${req.user._id}`)
+        .to(`user:${receiver}`)
+        .emit("new_message", message);
     res.status(201).json({ message });
 };
 

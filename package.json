@@ -5,11 +5,14 @@
   "main": "server/server.js",
   "scripts": {
     "start": "node server/server.js",
-    "dev": "nodemon server/server.js"
+    "dev": "nodemon server/server.js",
+    "test": "node --test"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1156.0",
     "bcryptjs": "^3.0.2",
     "cookie": "^1.0.2",
+    "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
     "dotenv": "^17.2.2",
     "express": "^5.1.0",
@@ -18,10 +21,12 @@
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.18.0",
     "multer": "^2.0.2",
-    "socket.io": "^4.8.1",
-    "cookie-parser": "^1.4.7"
+    "socket.io": "^4.8.1"
   },
   "devDependencies": {
     "nodemon": "^3.1.10"
+  },
+  "engines": {
+    "node": ">=20"
   }
 }

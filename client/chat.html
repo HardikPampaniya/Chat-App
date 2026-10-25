@@ -3,53 +3,107 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ChatApp</title>
+    <meta name="theme-color" content="#151b31">
+    <title>ChatApp - Private conversations</title>
     <link rel="stylesheet" href="/css/chat.css">
 </head>
 <body>
-    <div class="chat-shell">
-        <aside class="sidebar">
+    <div class="chat-shell" id="chatShell">
+        <aside class="sidebar" aria-label="Conversations">
             <div class="sidebar-header">
                 <div>
-                    <div class="brand-small">ChatApp</div>
-                    <div id="currentUser" class="muted small"></div>
+                    <div class="brand-lockup"><span class="brand-mark" aria-hidden="true">C</span><span class="brand-small">ChatApp</span></div>
+                    <div id="currentUser" class="muted small" aria-live="polite"></div>
                 </div>
-                <button id="logoutBtn" class="icon-btn" title="Logout">↪</button>
+                <div class="sidebar-actions">
+                    <a href="/profile.html" class="icon-btn profile-link" aria-label="Profile" title="Profile">●</a>
+                    <button id="logoutBtn" class="icon-btn" type="button" title="Log out" aria-label="Log out">↪</button>
+                </div>
             </div>
 
             <div class="search-wrap">
-                <input id="userSearch" type="search" placeholder="Search users...">
+                <label for="userSearch">Find people</label>
+                <input id="userSearch" type="search" placeholder="Search people..." autocomplete="off">
             </div>
 
-            <div id="userList" class="user-list"></div>
+            <div class="lists-scroll">
+                <section class="sidebar-section" aria-labelledby="recentHeading">
+                    <h2 id="recentHeading">Recent conversations</h2>
+                    <p id="conversationEmpty" class="contact-status muted">No conversations yet.</p>
+                    <nav id="conversationList" class="user-list" aria-label="Recent conversations"></nav>
+                </section>
+                <section class="sidebar-section" aria-labelledby="peopleHeading">
+                    <h2 id="peopleHeading">People</h2>
+                    <p id="contactStatus" class="contact-status muted" aria-live="polite">Loading people…</p>
+                    <nav id="userList" class="user-list" aria-label="People"></nav>
+                </section>
+            </div>
         </aside>
 
-        <main class="conversation-panel">
+        <main class="conversation-panel" id="conversationPanel">
             <header class="conversation-header">
-                <div>
-                    <h2 id="chatTitle">Select a user</h2>
-                    <p id="chatStatus" class="muted">Choose someone to start a private chat.</p>
+                <button id="backToList" class="back-btn" type="button" aria-label="Back to conversations">←</button>
+                <div class="conversation-heading">
+                    <h1 id="chatTitle">Select a person</h1>
+                    <p id="chatStatus" class="muted" aria-live="polite">Choose someone to start a private chat.</p>
                 </div>
-                <a href="/profile.html" class="profile-link">Profile</a>
+                <div class="call-actions" aria-label="Call actions">
+                    <button id="voiceCallBtn" class="call-btn" type="button" disabled aria-label="Start voice call" title="Voice call">☎</button>
+                    <button id="videoCallBtn" class="call-btn" type="button" disabled aria-label="Start video call" title="Video call">▣</button>
+                </div>
             </header>
 
-            <section id="messages" class="messages">
-                <div class="empty-state">
-                    <div class="empty-icon">💬</div>
-                    <h3>Your private messages</h3>
-                    <p>Select a user from the left to begin.</p>
+            <section id="messages" class="messages" aria-label="Messages" aria-live="polite" aria-relevant="additions text">
+                <div class="empty-state" id="emptyMessages">
+                    <div class="empty-icon" aria-hidden="true">✦</div>
+                    <h2>Your private messages</h2>
+                    <p>Select a person to begin a conversation.</p>
                 </div>
             </section>
 
+            <div id="uploadPanel" class="upload-panel" hidden aria-live="polite">
+                <div id="uploadPreview" class="upload-preview"></div>
+                <div class="upload-progress-wrap">
+                    <div id="uploadStatus" class="upload-status">Preparing attachment…</div>
+                    <progress id="uploadProgress" max="100" value="0">0%</progress>
+                </div>
+                <button id="cancelUploadBtn" class="icon-btn upload-cancel" type="button" aria-label="Cancel upload">×</button>
+            </div>
+
             <form id="messageForm" class="composer">
-                <label class="attach-btn" title="Send image or video">
-                    📎
-                    <input id="mediaInput" type="file" accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm,video/quicktime" hidden>
-                </label>
-                <input id="messageInput" type="text" maxlength="5000" placeholder="Type a message..." autocomplete="off" disabled>
-                <button type="submit" class="send-btn" disabled>Send</button>
+                <button id="attachBtn" class="attach-btn" type="button" title="Attach a file" aria-label="Attach a file" disabled>＋</button>
+                <input id="mediaInput" type="file" accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm,video/quicktime,audio/mpeg,audio/mp4,audio/x-m4a,audio/aac,audio/wav,audio/x-wav,audio/ogg,audio/webm,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" hidden>
+                <label class="sr-only" for="messageInput">Write a message</label>
+                <input id="messageInput" type="text" maxlength="5000" placeholder="Write a message…" autocomplete="off" disabled>
+                <button type="submit" class="send-btn" disabled><span>Send</span><span aria-hidden="true">↗</span></button>
             </form>
         </main>
+    </div>
+
+    <div id="callOverlay" class="call-overlay" hidden>
+        <section class="call-card" role="dialog" aria-modal="true" aria-labelledby="callHeading" aria-describedby="callStatus">
+            <header class="call-header">
+                <div class="avatar call-avatar" id="callAvatar" aria-hidden="true">?</div>
+                <div><h2 id="callHeading">Call</h2><p id="callStatus" class="muted" aria-live="polite">Connecting…</p></div>
+                <span id="callDuration" class="call-duration" aria-live="off"></span>
+            </header>
+            <div id="callVideos" class="call-videos">
+                <video id="remoteVideo" class="remote-video" autoplay playsinline></video>
+                <video id="localVideo" class="local-video" autoplay muted playsinline></video>
+                <audio id="remoteAudio" autoplay></audio>
+            </div>
+            <p id="callError" class="call-error" aria-live="assertive"></p>
+            <div id="incomingActions" class="call-controls" hidden>
+                <button id="callRejectBtn" class="call-control danger" type="button">Decline</button>
+                <button id="callAcceptBtn" class="call-control accept" type="button">Accept</button>
+            </div>
+            <div id="activeActions" class="call-controls" hidden>
+                <button id="callMicBtn" class="call-control" type="button" aria-pressed="true">Mute mic</button>
+                <button id="callCameraBtn" class="call-control" type="button" aria-pressed="true" hidden>Turn camera off</button>
+                <button id="switchCameraBtn" class="call-control" type="button" hidden>Switch camera</button>
+                <button id="callEndBtn" class="call-control danger" type="button">End call</button>
+            </div>
+        </section>
     </div>
 
     <script src="/socket.io/socket.io.js"></script>
