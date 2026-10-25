@@ -27,9 +27,18 @@ const requireStorage = () => {
     }
 };
 
+const sendStorageCommand = async (operation, command) => {
+    try {
+        return await s3.send(command);
+    } catch (error) {
+        error.storageOperation = operation;
+        throw error;
+    }
+};
+
 const putMedia = async ({ key, body, contentType, metadata }) => {
     requireStorage();
-    const result = await s3.send(new PutObjectCommand({
+    const result = await sendStorageCommand("PutObject", new PutObjectCommand({
         Bucket: bucket,
         Key: key,
         Body: body,
@@ -43,7 +52,7 @@ const putMedia = async ({ key, body, contentType, metadata }) => {
 
 const createMultipartMediaUpload = async ({ key, contentType, metadata }) => {
     requireStorage();
-    const result = await s3.send(new CreateMultipartUploadCommand({
+    const result = await sendStorageCommand("CreateMultipartUpload", new CreateMultipartUploadCommand({
         Bucket: bucket,
         Key: key,
         ContentType: contentType,
@@ -55,7 +64,7 @@ const createMultipartMediaUpload = async ({ key, contentType, metadata }) => {
 
 const uploadMediaPart = async ({ key, uploadId, partNumber, body }) => {
     requireStorage();
-    const result = await s3.send(new UploadPartCommand({
+    const result = await sendStorageCommand("UploadPart", new UploadPartCommand({
         Bucket: bucket,
         Key: key,
         UploadId: uploadId,
@@ -68,7 +77,7 @@ const uploadMediaPart = async ({ key, uploadId, partNumber, body }) => {
 
 const completeMultipartMediaUpload = async ({ key, uploadId, parts }) => {
     requireStorage();
-    return s3.send(new CompleteMultipartUploadCommand({
+    return sendStorageCommand("CompleteMultipartUpload", new CompleteMultipartUploadCommand({
         Bucket: bucket,
         Key: key,
         UploadId: uploadId,
@@ -80,22 +89,22 @@ const completeMultipartMediaUpload = async ({ key, uploadId, parts }) => {
 
 const abortMultipartMediaUpload = async ({ key, uploadId }) => {
     if (!key || !uploadId || !bucket || !s3) return;
-    await s3.send(new AbortMultipartUploadCommand({ Bucket: bucket, Key: key, UploadId: uploadId }));
+    await sendStorageCommand("AbortMultipartUpload", new AbortMultipartUploadCommand({ Bucket: bucket, Key: key, UploadId: uploadId }));
 };
 
 const getMedia = async (key, range) => {
     requireStorage();
-    return s3.send(new GetObjectCommand({ Bucket: bucket, Key: key, Range: range }));
+    return sendStorageCommand("GetObject", new GetObjectCommand({ Bucket: bucket, Key: key, Range: range }));
 };
 
 const getMediaMetadata = async key => {
     requireStorage();
-    return s3.send(new HeadObjectCommand({ Bucket: bucket, Key: key }));
+    return sendStorageCommand("HeadObject", new HeadObjectCommand({ Bucket: bucket, Key: key }));
 };
 
 const deleteMedia = async key => {
     if (!key || !bucket || !s3) return;
-    await s3.send(new DeleteObjectCommand({ Bucket: bucket, Key: key }));
+    await sendStorageCommand("DeleteObject", new DeleteObjectCommand({ Bucket: bucket, Key: key }));
 };
 
 module.exports = {

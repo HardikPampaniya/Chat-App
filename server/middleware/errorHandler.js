@@ -5,15 +5,39 @@ const errorHandler = (error, req, res, next) => {
     let message = status < 500 ? error.message : "Internal server error";
     const storageStatus = Number(error.$metadata?.httpStatusCode || error.statusCode);
     const storageCode = error.Code || error.code || error.name;
-    if (storageStatus === 403 || ["AccessDenied", "InvalidAccessKeyId", "SignatureDoesNotMatch", "ExpiredToken"].includes(storageCode)) {
+    const storageCodeText = String(storageCode || "");
+    const isStorageError = Boolean(error.storageOperation);
+    const isStorageCredentialsError = [
+        "CredentialsProviderError",
+        "InvalidAccessKeyId",
+        "InvalidClientTokenId",
+        "SignatureDoesNotMatch",
+        "ExpiredToken",
+        "UnrecognizedClientException"
+    ].includes(storageCodeText);
+
+    if (isStorageError) {
         status = 503;
-        message = "Media storage denied access. Check the Render bucket name, storage credentials, region, and bucket permissions.";
-        console.error("Object storage authorization failed", {
+        message = "Media storage request failed. Check the Render logs for the storage error code.";
+        if (storageStatus === 403 || storageCodeText === "AccessDenied") {
+            message = "Media storage denied access. Check the bucket name, credentials, region, bucket permissions, and encryption key permissions.";
+        } else if (isStorageCredentialsError) {
+            message = "Media storage credentials could not be loaded or were rejected. Check the Render AWS/S3 credentials.";
+        } else if (["NoSuchBucket", "NotFound"].includes(storageCodeText)) {
+            message = "The configured media bucket was not found. Check MEDIA_BUCKET, AWS_REGION, and the S3 endpoint.";
+        } else if (["PermanentRedirect", "AuthorizationHeaderMalformed", "IncorrectEndpoint"].includes(storageCodeText)) {
+            message = "The media storage region or endpoint is incorrect. Check AWS_REGION and S3_ENDPOINT in Render.";
+        } else if (storageCodeText === "NoSuchKey") {
+            status = 404;
+            message = "The media file was not found in storage.";
+        }
+        console.error("Object storage request failed", {
             method: req.method,
             path: req.path,
-            code: storageCode,
+            code: storageCodeText || undefined,
             status: storageStatus || undefined,
-            operation: error.name || "StorageError"
+            operation: error.storageOperation,
+            requestId: error.$metadata?.requestId
         });
     }
     if (error.message === "Media storage is not configured") {
@@ -29,8 +53,13 @@ const errorHandler = (error, req, res, next) => {
         message = "Invalid request data";
     }
 
-    if (status >= 500 && storageStatus !== 403 && !["AccessDenied", "InvalidAccessKeyId", "SignatureDoesNotMatch", "ExpiredToken"].includes(storageCode)) {
-        console.error("Request failed", { method: req.method, path: req.path, name: error.name || "Error" });
+    if (status >= 500 && !isStorageError) {
+        console.error("Request failed", {
+            method: req.method,
+            path: req.path,
+            name: error.name || "Error",
+            code: error.code || error.errno || undefined
+        });
     }
 
     res.status(status).json({ message });
