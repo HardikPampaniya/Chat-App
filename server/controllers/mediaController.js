@@ -61,7 +61,13 @@ const sendMedia = async (req, res) => {
         return res.status(415).json({ message: "The file contents do not match a supported file type" });
     }
 
-    const conversation = await Conversation.findById(conversationId);
+    let conversation;
+    try {
+        conversation = await Conversation.findById(conversationId);
+    } catch (error) {
+        error.mediaStage = "load conversation";
+        throw error;
+    }
     if (!conversation || !isParticipant(conversation, req.user._id)) {
         return res.status(403).json({ message: "Access denied" });
     }
@@ -85,6 +91,7 @@ const sendMedia = async (req, res) => {
     let message;
 
     const previousLastMessage = conversation.lastMessage;
+    let mediaStage = "write media object";
     try {
         const etag = await putMedia({
             key: storageKey,
@@ -97,6 +104,7 @@ const sendMedia = async (req, res) => {
         });
         stored = true;
 
+        mediaStage = "create media message";
         message = await Message.create({
             conversation: conversation._id,
             sender: req.user._id,
@@ -113,9 +121,11 @@ const sendMedia = async (req, res) => {
             }
         });
 
+        mediaStage = "save conversation last message";
         conversation.lastMessage = message._id;
         await conversation.save();
     } catch (error) {
+        error.mediaStage = mediaStage;
         if (message?._id) await Message.deleteOne({ _id: message._id }).catch(() => {});
         if (message?._id) {
             conversation.lastMessage = previousLastMessage;
@@ -133,13 +143,18 @@ const sendMedia = async (req, res) => {
         throw error;
     }
 
-    await message.populate("sender", "username");
-    await message.populate("receiver", "username");
-    req.app.get("io").to(roomFor(conversationId))
-        .to(`user:${req.user._id}`)
-        .to(`user:${receiver}`)
-        .emit("new_message", message);
-    res.status(201).json({ message });
+    try {
+        await message.populate("sender", "username");
+        await message.populate("receiver", "username");
+        req.app.get("io").to(roomFor(conversationId))
+            .to(`user:${req.user._id}`)
+            .to(`user:${receiver}`)
+            .emit("new_message", message);
+        res.status(201).json({ message });
+    } catch (error) {
+        error.mediaStage = "populate or broadcast media message";
+        throw error;
+    }
 };
 
 const getMedia = async (req, res) => {

@@ -37,7 +37,8 @@ const errorHandler = (error, req, res, next) => {
             code: storageCodeText || undefined,
             status: storageStatus || undefined,
             operation: error.storageOperation,
-            requestId: error.$metadata?.requestId
+            requestId: error.$metadata?.requestId,
+            stack: error.stack?.split("\n").slice(1, 6).map(frame => frame.trim())
         });
     }
     if (error.message === "Media storage is not configured") {
@@ -58,7 +59,9 @@ const errorHandler = (error, req, res, next) => {
             method: req.method,
             path: req.path,
             name: error.name || "Error",
-            code: error.code || error.errno || undefined
+            code: error.code || error.errno || undefined,
+            stage: error.mediaStage,
+            stack: error.stack?.split("\n").slice(1, 6).map(frame => frame.trim())
         });
     }
 
